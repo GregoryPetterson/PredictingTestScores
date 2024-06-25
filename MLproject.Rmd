@@ -1,0 +1,157 @@
+---
+title: "Untitled"
+author: "Andy Weglewski and Gregory Peterson"
+date: '2024-04-10'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## What We Need to Do
+
+Do more data Analysis
+Try Removing outliers
+Try with different inputs
+
+## Data Analysis
+```{r}
+study <- read.csv("study_performance.csv")
+head(study)
+
+groupA <- study[study$race_ethnicity=="group A",]
+groupB <- study[study$race_ethnicity=="group B",]
+groupC <- study[study$race_ethnicity=="group C",]
+groupD <- study[study$race_ethnicity=="group D",]
+groupE <- study[study$race_ethnicity=="group E",]
+print("GroupA")
+summary(groupA)
+print("GroupB")
+summary(groupB)
+print("GroupC")
+summary(groupC)
+print("GroupD")
+summary(groupD)
+print("GroupE")
+summary(groupE)
+
+
+standard <- study[study$lunch=="standard",]
+free <- study[study$lunch=="free/reduced",]
+summary(standard)
+summary(free)
+
+none <- study[study$test_preparation_course=="none",]
+completed <- study[study$test_preparation_course=="completed",]
+summary(none)
+summary(completed)
+
+someHighSchool <- study[study$parental_level_of_education=="some high school",]
+
+someCollege <- study[study$parental_level_of_education=="high school" | study$parental_level_of_education=="some college",]
+
+BachelorMasters <- study[study$parental_level_of_education=="associate's degree" | study$parental_level_of_education=="bachelor's degree" | study$parental_level_of_education=="master's degree",]
+
+print("someHighSchool")
+summary(someHighSchool)
+print("someCollege")
+summary(someCollege)
+print("BachelorMasters")
+summary(BachelorMasters)
+
+library(corrplot)
+ 
+# creating correlation matrix
+correlation_matrix <- round(cor(processed),2)
+ 
+corrplot(correlation_matrix, method = "number")
+
+
+boxplot(reading_score~lunch,data=study, main="Test Data",
+   xlab="Free or Paid Lunch", ylab="Test Score")
+
+
+```
+## Data Processing
+```{r}
+gender<- model.matrix(~gender-1, data=study)
+ethnicity<- model.matrix(~race_ethnicity-1, data=study)
+lunch<- model.matrix(~lunch-1, data=study)
+math <- study$math_score/100
+reading<- study$reading_score/100
+writing<-study$writing_score/100
+
+library(dplyr)
+
+education <- ifelse(study$parental_level_of_education == "some high school", 1,
+                    ifelse(study$parental_level_of_education == "high school", 2,
+                           ifelse(study$parental_level_of_education == "some college", 2,3)))
+
+processed <-cbind(gender, ethnicity, education, lunch, math, reading, writing)
+
+
+```
+
+## Splitting data into training and testing
+```{r}
+sample_size <- 800
+#set.seed(1234) # 1234
+
+picked <- sample(seq_len(nrow(processed)),size = sample_size)
+picked_training <- processed[picked,]
+picked_testing <- processed[-picked,]
+
+xTraining <- picked_training[,1:10]
+xTesting <- picked_testing[,1:10]
+```
+# Setting Y for Math Scores
+```{r}
+yTraining <- picked_training[,11]
+yTesting <- picked_testing[,11]
+```
+# Setting Y for Reading Scores
+```{r}
+yTraining <- picked_training[,12]
+yTesting <- picked_testing[,12]
+```
+# Setting Y for Writing Scores
+```{r}
+yTraining <- picked_training[,13]
+yTesting <- picked_testing[,13]
+```
+## Training
+```{r}
+#sigmoid
+#look at different metric outside accuracy
+library(keras3)
+library(tfdatasets)
+model = keras_model_sequential() %>%
+  layer_dense(units = 8, activation = "relu",input_shape=(10)) %>%
+  #layer_dense(units = 8, activation = "relu") %>%
+  layer_dense(units = 1)
+
+
+model %>% compile(
+  loss = "mean_absolute_error",
+  optimizer = "adam", 
+)
+
+model %>% 
+  fit(
+    x = xTraining, # input is the first 4 columns of the dataframe
+    y = yTraining, # label is the last column
+    epochs = 20
+  )
+
+```
+
+## Testing
+```{r}
+model %>% evaluate(xTesting, yTesting)
+
+
+result <- model %>% predict(xTesting)
+
+result
+
+```
